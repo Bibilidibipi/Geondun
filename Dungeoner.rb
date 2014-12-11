@@ -553,7 +553,7 @@ loop do
 		  (input.size == 2 && input[0] == 'look' && ['tools', 'chair', 'pedestal', 'papers', 'plants'].include?(input[1]))
 		puts 'What?'
 		tries += 1
-		puts "Maybe you'd like to " + valid.sample.to_s + " something?" if tries >= 3
+		puts "Maybe you'd like to " + double.sample.to_s + " something?" if tries >= 3
 		input = gets.chomp.split(' ')
 	end
 
