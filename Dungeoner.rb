@@ -1,6 +1,6 @@
 #needs prettying of ingame text, doublecheck and comment
 class Dungeon
-	attr_accessor :player1, :player2, :player, :rooms, :items, :maze, :game
+	attr_accessor :player1, :player2, :player, :other_player, :rooms, :items, :maze, :game
 
 	#initializes players, item taken trackers, achievement trackers, and other trackers
 	def initialize(player_name1, player_name2)
@@ -10,11 +10,14 @@ class Dungeon
 		@other_player = @player2
 		@rooms = []
 		@items = []
+		@maze = Maze.new
+		
 		@pills_taken = false
 		@box_taken = false
 		@crystal_taken = 0
 		@beans_taken = false
 		@notes_taken = false
+		
 		@escape_artists = 'escape artists'
 		@pica = 'pica'
 		@generous = 'generous'
@@ -23,6 +26,7 @@ class Dungeon
 		@double_stink = 'double stink'
 		@overdose = 'overdose'
 		@dead_and_free = 'dead and free'
+		
 		@eaten = 0
 		@given = 0
 		@game = true
@@ -34,60 +38,10 @@ class Dungeon
 		@other_player.location = location2
 	end
 
-	#returns room object in dungeon or maze, given its reference
-	#returns nil if reference isn't valid
-	def find_room_in_dungeon(reference)
-		room = @rooms.detect{|room| room.reference == reference}
-		room = find_room_in_maze(reference) if room == nil
-		room
-	end
 
-	#returns reference of destination given reference of a direction
-	#returns nil if direction isn't valid
-	def find_room_in_direction(direction)
-		find_room_in_dungeon(@player.location).connections[direction]
-	end
-
-	#puts report of movement, changes player location, deals with location effects, switches player
-	def go(direction)
-		valid = true
-		reply = "\nYou go " + direction.to_s
-		if find_room_in_direction(direction) == nil
-			reply = "\nYou can't go that way" 
-			valid = false
-		else
-			@player.location = find_room_in_direction(direction)
-			
-			#location effects
-			if @player.location == :Rubbisher
-				@player.stench = 4 
-				@player.beans = 0
-			end
-			if @player.location == :free
-				@player.won = true
-			end
-		
-		end
-		puts reply
-		switch_player if valid
-	end
-
-	#returns item object given its reference
-	#returns nil if reference isn't valid
-	def find_item(reference)
-		@items.detect{|i| i.reference = reference}
-	end
-
-	#puts current player's inventory
-	def show_inventory
-		empty = String.new
-		empty = "empty pockets" if @player.inventory.size == 0
-		puts "\nYou have: " + @player.inventory.join(", ") + empty
-	end
-
-
+	
 	class Player
-		attr_accessor :name, :location, :stench, :beans, :pills, :inventory, :dead, :won
+		attr_accessor :name, :location, :stench, :beans, :pills, :inventory, :dead
 
 		def initialize(name)
 			@name = name
@@ -96,10 +50,8 @@ class Dungeon
 			@pills = 0
 			@inventory = []
 			@dead = false
-			@won = false
 		end
 	end
-
 
 	class Room
 		attr_accessor :reference, :description, :connections, :items
@@ -110,12 +62,7 @@ class Dungeon
 			@connections = connections
 			@items = items
 		end
-
-		def full_description
-			@reference.to_s + "\n\nYou are in " + @description
-		end
 	end
-
 
 	#describes a maze with a garden and a random number of other rooms
 	class Maze
@@ -147,7 +94,6 @@ class Dungeon
 		end 
 	end
 
-
 	class Item
 		attr_accessor :reference, :description, :location
 
@@ -159,13 +105,154 @@ class Dungeon
 	end
 
 
+
+	def add_room(reference, description, connections, items)
+		@rooms << Room.new(reference, description, connections, items)
+	end
+
+	def add_item(reference, description, location)
+		@items << Item.new(reference, description, location)
+	end
+
+
+
+	#returns a room in this class's maze object, given the room's reference
+	def find_room_in_maze(reference)
+		@maze.rooms.detect{|room| room.reference == reference}
+	end
+
+	#returns room object in dungeon or maze, given room's reference
+	#returns nil if reference isn't valid
+	def find_room_in_dungeon(reference)
+		room = @rooms.detect{|room| room.reference == reference}
+		room = find_room_in_maze(reference) if room == nil
+		room
+	end
+
+	#returns reference of destination given reference of a direction
+	#returns nil if direction isn't valid
+	def find_room_in_direction(direction)
+		find_room_in_dungeon(@player.location).connections[direction]
+	end
+
+	#returns item object given its reference
+	#returns nil if reference isn't valid
+	def find_item(reference)
+		@items.detect{|i| i.reference = reference}
+	end
+
+
+
+	#handles regular movement in dungeon, not movement in maze or entrance of maze
+	#puts result of movement attempt, and if valid:
+		#changes player location, deals with location effects, and switches player.
+	def go(direction)
+		valid = true
+		reply = "\nYou go " + direction.to_s
+		if find_room_in_direction(direction) == nil
+			reply = "\nYou can't go that way" 
+			valid = false
+		else
+			@player.location = find_room_in_direction(direction)
+			
+			#Rubbisher effect, in case player enters Rubbisher
+			#and is wobbed out before beginning turn
+			if @player.location == :Rubbisher
+				@player.stench = 4 
+				@player.beans = 0
+			end
+		
+		end
+		puts reply
+		switch_player if valid
+	end
+
+	#puts player in a random room in maze
+	def enter_maze
+		@player.location = @maze.rooms.sample.reference
+		puts "You go west."
+	end
+
+	#puts result of movement attempt in maze, and switches player if valid
+	def go_maze(direction)
+		location = find_room_in_maze(@player.location)
+		valid = true
+		reply = "You go " + direction.to_s + "."
+		unless location.connections.include?(direction)
+			reply = "You can't go that way" 
+			valid = false
+		else
+			@player.location = @maze.rooms.sample.reference
+		end
+		puts reply
+		switch_player if valid
+	end
+
+
+
+	#puts description of the room current player is in
+	def show_current_description
+		location = find_room_in_dungeon(@player.location)
+		reply = String.new
+
+		#format of description depends on location: dungeon, Lair, or maze?
+		if find_room_in_maze(@player.location) == nil
+			reply = "\n" + @player.name + " is in the " + location.reference.to_s + 
+					",\n" + location.description
+			if @player.location == :Lair
+				if find_room_in_dungeon(:Lair).connections[:north] == nil
+					reply += " A malformed creature crouches on its\n"\
+							 "haunches in the middle of the room. There's an exit to\n"\
+							 "the south." 
+				else
+					reply += " There are exits to the north and south."
+				end
+			end
+		else
+			reply = "\n" + @player.name + " is in " + location.description 
+		end
+		
+		#adds list of items dropped on floor
+		floor = location.items.clone
+		case location.reference
+		when :Laboratorium then
+			floor.delete(:crystal) if @crystal_taken == 0
+			floor.delete_at(floor.find_index(:crystal)) if @crystal_taken == 1
+		when :Lounge then
+			floor.delete(:pills) unless @pills_taken
+		when :garden then
+			floor.delete(:beans) unless @beans_taken
+		when :Library then
+			floor.delete(:box) unless @box_taken
+		when :Study then
+			floor.delete(:notes) unless @notes_taken
+		end
+		if floor.size == 1
+			reply += "\nThere's the following item on the floor: " + floor.join
+		end
+		if floor.size > 1
+			reply += "\nThere are the following items on the floor:\n" + floor.join(", ")
+		end
+		puts reply
+	end
+
+	#puts current player's inventory
+	def show_inventory
+		empty = String.new
+		empty = "empty pockets" if @player.inventory.size == 0
+		puts "\nYou have: " + @player.inventory.join(", ") + empty
+	end
+
 	#puts currently available commands
 	def valid_input
+		#adds single word commands
 		valid = ['help', 'wait', 'inventory']
 		location = find_room_in_dungeon(@player.location)
 		location.connections.each do |direction, destination|
 			valid << direction.to_s
 		end
+		
+		#adds two word commands
 		@player.inventory.each do |reference|
 			['eat', 'throw', 'examine', 'drop'].each do |action|
 			valid << action + " " + reference.to_s
@@ -205,6 +292,8 @@ class Dungeon
 		end
 	end
 
+
+
 	#switches players and handles a whole shitton of other stuff
 	def switch_player
 		puts "\n"
@@ -227,7 +316,7 @@ class Dungeon
 		@player.stench = 4 if @player.location == :Rubbisher
 		@player.beans -= 1
 		@player.pills += 1 if @player.pills > 0
-		if @player.won && @other_player.won
+		if @player.location == :free && @other_player.location == :free
 			@escape_artists = @escape_artists.upcase
 			if @player.stench > 0 || @player.beans > 0 || @other_player.stench > 0 || @other_player.beans > 0
 				@stinky = @stinky.upcase
@@ -252,18 +341,18 @@ class Dungeon
 			@game = false
 			return
 		end
-		if @player.won && @other_player.dead
+		if @player.location == :free && @other_player.dead
 			puts "\nYou've escaped, but you've left your friend behind to rot.\n"\
 				 "Way to go, hero."
 			@game = false
 		end
-		if @player.won
+		if @player.location == :free
 			puts "\n" + @player.name + " is free!"
 		end
 		if @player.dead
 			puts "\n" + @player.name + " is dead."
 		end
-		show_current_description unless @player.won
+		show_current_description unless @player.location == :free
 		puts "\nThe world swims before your eyes." if @player.pills == 2
 		puts "\nIn the corners of your vision, colorful phantasms\nflicker in and out of being." if @player.pills == 3
 		puts "\nYou can see a spirit world overlaying the real one.\nYour stomach hurts." if @player.pills == 4
@@ -295,10 +384,10 @@ class Dungeon
 			"Without the creature there, you can see an exit to the north."
 			win_door(:Lair, :north)
 		end
-		if @player.won && @other_player.dead
+		if @player.location == :free && @other_player.dead
 			return
 		end
-		if @player.won
+		if @player.location == :free
 			switch_player
 			return
 		end
@@ -316,84 +405,7 @@ class Dungeon
 	
 	end
 
-	def add_room(reference, description, connections, items)
-		@rooms << Room.new(reference, description, connections, items)
-	end
 
-	#creates a new maze object and puts player in a random room in said maze
-	def enter_maze
-		@maze = Maze.new
-		@player.location = @maze.rooms.sample.reference
-		puts "You go west."
-	end
-
-	#returns a room in a maze object, given its reference
-	def find_room_in_maze(reference)
-		@maze.rooms.detect{|room| room.reference == reference}
-	end
-
-	#puts result of movement attempt, and switches player if valid
-	def go_maze(direction)
-		location = find_room_in_maze(@player.location)
-		valid = true
-		reply = "You go " + direction.to_s + "."
-		unless location.connections.include?(direction)
-			reply = "You can't go that way" 
-			valid = false
-		else
-			@player.location = @maze.rooms.sample.reference
-		end
-		puts reply
-		switch_player if valid
-	end
-
-	#puts description of the room current player is in
-	def show_current_description
-		location = find_room_in_dungeon(@player.location)
-		reply = "\n" + @player.name + " is in the " + location.reference.to_s + ",\n" + location.description
-		if @rooms.detect{|room| room.reference == @player.location} == nil
-			reply = "\n" + @player.name + " is in " + location.description 
-		end
-		if @player.location == :Lair
-			if find_room_in_dungeon(:Lair).connections[:north] == nil
-				reply += " A malformed creature crouches on its\n"\
-						 "haunches in the middle of the room. There's an exit to\n"\
-						 "the south." 
-			else
-				reply += " There are exits to the north and south."
-			end
-		end
-		floor = location.items.clone
-		case location.reference
-		when :Laboratorium then
-			floor.delete(:crystal) if @crystal_taken == 0
-			floor.delete_at(floor.find_index(:crystal)) if @crystal_taken == 1
-		when :Lounge then
-			floor.delete(:pills) unless @pills_taken
-		when :garden then
-			floor.delete(:beans) unless @beans_taken
-		when :Library then
-			floor.delete(:box) unless @box_taken
-		when :Study then
-			floor.delete(:notes) unless @notes_taken
-		end
-		if floor.size == 1
-			reply += "\nThere's the following item on the floor: " + floor.join
-		end
-		if floor.size > 1
-			reply += "\nThere are the following items on the floor:\n" + floor.join(", ")
-		end
-		puts reply
-	end
-
-	def add_item(reference, description, location)
-		@items << Item.new(reference, description, location)
-	end
-
-	#returns item object, given its reference
-	def find_item(reference)
-		@items.detect{|i| i.reference == reference}
-	end
 
 	def eat(reference)
 		item = @items.detect{|i| i.reference == reference && i.location == @player.inventory}
@@ -615,6 +627,8 @@ class Dungeon
 		switch_player if valid
 	end
 
+
+
 	def win_door(room, direction)
 		add_room(:free, '', {}, [])
 		room = find_room_in_dungeon(room)
@@ -632,10 +646,13 @@ class Dungeon
 	end
 end
 
+
+
 #create the main dungeon object
 puts "\nGeondun is meant to be explored more than won. Don't be\n"\
 	 "afraid to restart if you think you've reached a dead end.\n"\
-	 "Type 'quit' to quit, and 'help' if you get really stuck."
+	 "Type 'inventory' to see what you have, 'quit' to quit, and\n"\
+	 "'help' if you get really stuck."
 puts "\nWhat's your name?"
 player1 = gets.chomp.strip
 while player1 == ''
@@ -649,7 +666,7 @@ while player2 == '' || player2 == player1
 	puts "Choose a different friend" if player2 == player1
 	player2 = gets.chomp.strip
 end
-geondun = Dungeon.new(player2, player2)
+geondun = Dungeon.new(player2, player1)
 
 #add rooms
 geondun.add_room(:Laboratorium, 
@@ -716,7 +733,7 @@ geondun.add_item(:ghost,
 #start the dungeon by placing the players in the Laboratorium
 geondun.start(:Laboratorium, :Laboratorium)
 geondun.switch_player
-single = ['east', 'north', 'west', 'south', 'wait', 'inventory', 'help']
+single = ['east', 'north', 'west', 'south', 'wait', 'inventory', 'help', 'quit']
 double = ['eat', 'throw', 'examine', 'give', 'wob', 'look', 'take', 'drop']
 help_asked = false
 
