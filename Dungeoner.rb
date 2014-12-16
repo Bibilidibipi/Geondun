@@ -138,7 +138,7 @@ class Dungeon
 	#returns item object given its reference
 	#returns nil if reference isn't valid
 	def find_item(reference)
-		@items.detect{|i| i.reference = reference}
+		@items.detect{|i| i.reference == reference}
 	end
 
 
